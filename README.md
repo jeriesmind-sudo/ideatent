@@ -1,50 +1,70 @@
 # IdeaTent
 
-IdeaTent is a lightweight, invite-only content-planning product for businesses.
+IdeaTent is a private-beta standby social-media copywriter. It learns a business profile, researches reusable current trends, produces five complete weekly posts, runs an editorial quality check, remembers recent ideas, supports on-demand rewrites, saves the plan, and can deliver it by email on a Cloudflare schedule.
 
-Its core promise is simple:
+Production rollout instructions are in [docs/standby-copywriter-setup.md](docs/standby-copywriter-setup.md).
 
-> Tell IdeaTent about your business once, and never run out of relevant, high-quality content ideas.
+IdeaTent is an invite-only weekly content-planning product for businesses. It learns a business profile once, generates a five-idea weekly plan, saves the plan, and records owner feedback.
 
-Each week, IdeaTent researches timely industry and regional trends, matches them to a business profile, generates a personalized content plan, checks it for quality, saves it, and emails it to the business owner.
+## Live private beta
 
-## MVP status
+- App: https://ideatent.jeriesmind.workers.dev
+- Hosting: Cloudflare Workers
+- Access: Cloudflare Zero Trust email allowlist
+- Data: Cloudflare D1
+- Generation: Cloudflare Workers AI
 
-IdeaTent is currently in the product-definition stage. The MVP scope and technical handoff are complete; implementation has not started.
+The live app is private. Visitors must pass the configured Cloudflare Access policy before the Worker receives their request.
 
-The private beta is designed to test one question: **Can IdeaTent consistently give businesses content ideas they genuinely want to use?**
+## Implemented
 
-## Planned stack
+- Five-step business onboarding with required-field validation
+- Authenticated, persisted business profiles
+- AI-generated weekly plans with schema validation and a safe starter-plan fallback
+- Saved plan history
+- Per-plan usefulness feedback
+- Private Worker access and server-side identity checks
+- Mobile-first dashboard and onboarding flow
 
-- Cloudflare Workers for the application and scheduled jobs
-- Cloudflare D1 for structured data
-- Cloudflare Workers AI with Gemini as a fallback
-- Tavily for reusable trend research
-- Gmail API for weekly email delivery
-- A mobile-first web interface
+## Still planned for the MVP
 
-## Core product loop
+- Tavily-powered trend research and caching
+- Automated weekly generation with Cloudflare Cron Triggers
+- Weekly email delivery and retry logging
+- Repetition checks across earlier plans
+- Beta hardening with real businesses
 
-`Learn the business → Research → Match → Generate → Quality check → Deliver → Learn from feedback`
+## Local development
 
-## MVP boundaries
+Requirements: Node.js 22.13 or newer and npm.
 
-The first version is an invite-only beta for up to 30 active businesses. It intentionally excludes payments, public signup, social-media publishing, analytics, image/video generation, team features, and other platform expansion.
+```sh
+npm ci
+npm run dev
+```
 
-## Documentation
+The portable development profile provides a local test identity at `/signin-with-chatgpt?return_to=/`. Production identity is provided by Cloudflare Access.
 
-- [Full MVP product and engineering handoff](docs/product-spec.md)
+Useful checks:
 
-## Suggested implementation order
+```sh
+npx tsc --noEmit
+npx eslint app db lib vite.config.ts
+npm run build
+```
 
-1. Foundation: authentication, approved-user access, D1 schema, onboarding, and dashboard
-2. Research: Tavily integration, caching, and industry/location trend pools
-3. Generation: provider abstraction, plan generation, quality control, and repetition protection
-4. Automation: weekly cron, batching, job tracking, and duplicate prevention
-5. Delivery: Gmail integration, email retry handling, and logs
-6. Beta hardening: validate the full loop with two real businesses
+The production build emits its deployable Worker configuration under `dist/server/`.
 
-## Security note
+## Data and configuration
 
-API keys, Gmail credentials, and session secrets must be stored as Cloudflare secrets and must never be committed to this repository.
+- D1 schema: `db/schema.ts`
+- D1 migration: `drizzle/0000_ideatent_foundation.sql`
+- Plan generator: `lib/plan-generator.ts`
+- Main interface: `app/ideatent-app.tsx`
+- Hosting bindings: `.openai/hosting.json`
 
+API keys, identity credentials, and other secrets must stay in Cloudflare secrets and must never be committed.
+
+## Product documentation
+
+- [MVP product and engineering handoff](docs/product-spec.md)

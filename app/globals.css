@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "../vendor/shadcn-tailwind-4.13.0.css";
+
+:root { --background:#f7f7fb; --foreground:#171621; --card:#fff; --card-foreground:#171621; --popover:#fff; --popover-foreground:#171621; --primary:#5b4dc5; --primary-foreground:#fff; --secondary:#eeedf8; --secondary-foreground:#342d72; --muted:#efeff4; --muted-foreground:#6f6d7b; --accent:#efeff8; --accent-foreground:#25213c; --destructive:#d33c56; --border:#dfdee8; --input:#d7d5e2; --ring:#786be0; --radius:.85rem; }
+@theme inline { --color-background:var(--background); --color-foreground:var(--foreground); --color-card:var(--card); --color-card-foreground:var(--card-foreground); --color-popover:var(--popover); --color-popover-foreground:var(--popover-foreground); --color-primary:var(--primary); --color-primary-foreground:var(--primary-foreground); --color-secondary:var(--secondary); --color-secondary-foreground:var(--secondary-foreground); --color-muted:var(--muted); --color-muted-foreground:var(--muted-foreground); --color-accent:var(--accent); --color-accent-foreground:var(--accent-foreground); --color-destructive:var(--destructive); --color-border:var(--border); --color-input:var(--input); --color-ring:var(--ring); --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius); --radius-xl:calc(var(--radius) + 5px); --font-sans:"Aptos","Segoe UI",Inter,ui-sans-serif,system-ui,sans-serif; }
+* { border-color:var(--border); }
+html { scroll-behavior:smooth; }
+body { margin:0; background:radial-gradient(circle at 13% 0%,rgba(105,87,221,.09),transparent 25rem),var(--background); color:var(--foreground); font-family:var(--font-sans); font-size:16px; }
+::selection { background:#d7d2ff; color:#201b4c; }

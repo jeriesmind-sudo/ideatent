@@ -1,0 +1,17 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "ideatent-weekly-automation",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_URL": "https://ideatent.jeriesmind.workers.dev"
+  },
+  "triggers": {
+    "crons": ["0 6 * * 1"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
