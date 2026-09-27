@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
-import { businessProfiles, businesses, contentIdeas, users, weeklyPlans } from "@/db/schema";
+import { businessProfiles, businesses, contentIdeas, weeklyPlans } from "@/db/schema";
 import { incrementUsage } from "@/lib/usage";
+import { getAppAccess } from "@/lib/access-control";
 
 const REVISION_SCHEMA = {
   type: "object",
@@ -25,8 +25,8 @@ const PRESETS: Record<string, string> = {
 };
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
   if (!env.AI) return Response.json({ error: "The copy editor is temporarily unavailable" }, { status: 503 });
 
   const { id } = await context.params;
@@ -37,7 +37,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!instruction) return Response.json({ error: "Choose or enter a revision request" }, { status: 400 });
 
   const db = getDb();
-  const user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  const user = access.user;
   const idea = await db.query.contentIdeas.findFirst({ where: eq(contentIdeas.id, id) });
   if (!user || !idea) return Response.json({ error: "Post not found" }, { status: 404 });
   const plan = await db.query.weeklyPlans.findFirst({ where: eq(weeklyPlans.id, idea.weeklyPlanId) });

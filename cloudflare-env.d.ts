@@ -12,5 +12,7 @@ declare namespace Cloudflare {
     APP_URL?: string;
     ACCESS_CLIENT_ID?: string;
     ACCESS_CLIENT_SECRET?: string;
+    ADMIN_EMAIL?: string;
+    ADMIN_EMAILS?: string;
   }
 }

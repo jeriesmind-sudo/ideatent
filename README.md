@@ -10,7 +10,7 @@ IdeaTent is an invite-only weekly content-planning product for businesses. It le
 
 - App: https://ideatent.jeriesmind.workers.dev
 - Hosting: Cloudflare Workers
-- Access: Cloudflare Zero Trust email allowlist
+- Access: Cloudflare Zero Trust sign-in plus an in-app email allowlist
 - Data: Cloudflare D1
 - Generation: Cloudflare Workers AI
 
@@ -22,16 +22,20 @@ The live app is private. Visitors must pass the configured Cloudflare Access pol
 - Authenticated, persisted business profiles
 - AI-generated weekly plans with schema validation and a safe starter-plan fallback
 - Saved plan history
+- Downloadable branded PDF plans
+- PDF attachment on every delivered weekly-plan email
 - Per-plan usefulness feedback
 - Private Worker access and server-side identity checks
-- Mobile-first dashboard and onboarding flow
-
-## Still planned for the MVP
-
+- Administrator page for approving, disabling, and reactivating beta users without code changes
 - Tavily-powered trend research and caching
 - Automated weekly generation with Cloudflare Cron Triggers
-- Weekly email delivery and retry logging
+- Weekly email delivery and delivery logging
 - Repetition checks across earlier plans
+- Mobile-first dashboard and onboarding flow
+
+## Next hardening work
+
+- Automatic retry processing for failed email deliveries
 - Beta hardening with real businesses
 
 ## Local development

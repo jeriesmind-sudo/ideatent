@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, CalendarDays, Check, ChevronRight, Copy, Lightbulb, Menu, Sparkles, Target, Users, WandSparkles, X } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronRight, Copy, Download, Lightbulb, Menu, Plus, ShieldCheck, Sparkles, Target, Users, WandSparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -60,6 +60,18 @@ type StoredPlan = {
   ideas: StoredIdea[];
 };
 
+type Session = { email: string; displayName: string; isAdmin: boolean };
+
+type ApprovedUser = {
+  id: string;
+  email: string;
+  status: "active" | "disabled";
+  businessName: string | null;
+  businessStatus: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+};
+
 export function IdeaTentApp() {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -83,7 +95,13 @@ export function IdeaTentApp() {
   const [selectedTones, setSelectedTones] = useState<string[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [platform, setPlatform] = useState("");
-  const nav = [["Home", "home"], ["Previous plans", "plans"], ["Business profile", "profile"], ["Admin", "admin"]];
+  const [session, setSession] = useState<Session | null>(null);
+  const [accessError, setAccessError] = useState("");
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [approved, setApproved] = useState<ApprovedUser[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [adminStatus, setAdminStatus] = useState("");
+  const nav = [["Home", "home"], ["Previous plans", "plans"], ["Business profile", "profile"], ...(session?.isAdmin ? [["Admin", "admin"]] : [])];
   const titles = ["Tell us about your business", "Who are you trying to reach?", "How should your brand sound?", "What should your content achieve?", "Where do you post?"];
   const activePlan = plans[0];
   const displayIdeas = activePlan?.ideas.length
@@ -103,24 +121,34 @@ export function IdeaTentApp() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/profile")
-      .then(async (response): Promise<{ profile?: SavedProfile | null } | null> => response.ok ? response.json() : null)
-      .then((result) => {
-        const profile = result?.profile;
-        if (!active || !profile) return;
-        setHasProfile(true);
-        setName(profile.name ?? "");
-        setIndustry(profile.industry ?? "");
-        setLocation([profile.city, profile.country].filter(Boolean).join(", "));
-        setDescription(profile.description ?? "");
-        setAudience(profile.details?.targetAudience ?? "");
-        setSelectedTones(parseList(profile.details?.brandTone, []));
-        setSelectedGoals(parseList(profile.details?.contentGoals, []));
-        const channels = parseList(profile.details?.platforms, []);
-        setPlatform(channels.join(" + "));
+    fetch("/api/session")
+      .then(async (response) => {
+        const result = await response.json() as Session & { error?: string };
+        if (!response.ok) throw new Error(result.error || "Unable to verify access");
+        return result;
       })
-      .catch(() => undefined);
-    loadPlans();
+      .then(async (result) => {
+        if (!active) return;
+        setSession(result);
+        const profileResponse = await fetch("/api/profile");
+        const profileResult = profileResponse.ok ? await profileResponse.json() as { profile?: SavedProfile | null } : null;
+        const profile = profileResult?.profile;
+        if (profile) {
+          setHasProfile(true);
+          setName(profile.name ?? "");
+          setIndustry(profile.industry ?? "");
+          setLocation([profile.city, profile.country].filter(Boolean).join(", "));
+          setDescription(profile.description ?? "");
+          setAudience(profile.details?.targetAudience ?? "");
+          setSelectedTones(parseList(profile.details?.brandTone, []));
+          setSelectedGoals(parseList(profile.details?.contentGoals, []));
+          setPlatform(parseList(profile.details?.platforms, []).join(" + "));
+        }
+        await loadPlans();
+        if (result.isAdmin) await loadApprovedUsers();
+      })
+      .catch((error) => active && setAccessError(error instanceof Error ? error.message : "Unable to verify access"))
+      .finally(() => active && setSessionLoaded(true));
     return () => { active = false; };
   }, []);
 
@@ -147,6 +175,49 @@ export function IdeaTentApp() {
       setGenerationStatus(result.generation === "ai" ? "Your AI-generated plan is ready." : "Your starter plan is ready.");
     } catch (error) {
       setGenerationStatus(error instanceof Error ? error.message : "Could not generate your plan.");
+    }
+  }
+
+  async function loadApprovedUsers() {
+    const response = await fetch("/api/admin/users");
+    if (!response.ok) return;
+    const result = await response.json() as { users?: ApprovedUser[] };
+    setApproved(result.users ?? []);
+  }
+
+  async function addApprovedUser() {
+    setAdminStatus("Adding invitation…");
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not add this email");
+      setInviteEmail("");
+      setAdminStatus("Email approved. They can now sign in with the same address.");
+      await loadApprovedUsers();
+    } catch (error) {
+      setAdminStatus(error instanceof Error ? error.message : "Could not add this email");
+    }
+  }
+
+  async function changeApproval(user: ApprovedUser) {
+    const status = user.status === "active" ? "disabled" : "active";
+    setAdminStatus(`${status === "active" ? "Reactivating" : "Disabling"} ${user.email}…`);
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not update access");
+      setAdminStatus(`${user.email} is now ${status}.`);
+      await loadApprovedUsers();
+    } catch (error) {
+      setAdminStatus(error instanceof Error ? error.message : "Could not update access");
     }
   }
 
@@ -227,19 +298,22 @@ export function IdeaTentApp() {
     }
   }
 
+  if (!sessionLoaded) return <AccessState title="Opening your workspace…" detail="Checking your private beta access." />;
+  if (accessError) return <AccessState title="IdeaTent is invite-only" detail={accessError} />;
+
   return <main className="min-h-screen bg-background text-foreground">
     <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-xl">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
         <a href="#home" className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground"><Lightbulb className="size-4.5" /></span><b className="text-lg tracking-[-.03em]">IdeaTent</b></a>
         <nav className="hidden items-center gap-1 md:flex">{nav.map(([label, id], index) => <a key={id} href={`#${id}`} className={`rounded-lg px-3.5 py-2 text-sm font-medium ${index === 0 ? "bg-accent" : "text-muted-foreground hover:bg-accent"}`}>{label}</a>)}</nav>
-        <div className="flex gap-2"><div className="hidden rounded-xl border bg-card px-3 py-2 sm:block"><b className="block text-xs">Demo account</b><span className="block text-[11px] text-muted-foreground">Private beta</span></div><Button variant="outline" size="icon" className="md:hidden" onClick={() => setMenu(!menu)} aria-label="Toggle navigation">{menu ? <X /> : <Menu />}</Button></div>
+        <div className="flex gap-2"><div className="hidden rounded-xl border bg-card px-3 py-2 sm:block"><b className="block max-w-48 truncate text-xs">{session?.displayName || session?.email}</b><span className="block text-[11px] text-muted-foreground">{session?.isAdmin ? "Administrator" : "Private beta"}</span></div><Button variant="outline" size="icon" className="md:hidden" onClick={() => setMenu(!menu)} aria-label="Toggle navigation">{menu ? <X /> : <Menu />}</Button></div>
       </div>
       {menu && <nav className="grid border-t px-5 py-3 md:hidden">{nav.map(([label, id]) => <a key={id} href={`#${id}`} onClick={() => setMenu(false)} className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent">{label}</a>)}</nav>}
     </header>
 
     <div className="mx-auto max-w-7xl px-5 pb-24 pt-9 lg:px-8">
       <section id="home" className="scroll-mt-24">
-        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground"><span className={`rounded-full border px-2.5 py-1 font-medium ${activePlan ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>● &nbsp;{activePlan ? "Ready" : "Preview"}</span><span>{activePlan ? `Week of ${formatPlanDate(activePlan.weekStart)}` : "Generate your first saved plan"}</span></div><h1 className="text-3xl font-semibold tracking-[-.045em] sm:text-4xl">Your ideas for this week</h1><p className="mt-2 max-w-2xl leading-7 text-muted-foreground">{activePlan ? `Five useful starting points for ${name}, shaped around your audience, voice, and goals.` : "This preview shows the format. Complete your profile, then generate a plan that is saved to your account."}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl" onClick={() => setOpen(true)}>Edit business profile</Button><Button className="h-11 rounded-xl" disabled={Boolean(activePlan) || generationStatus === "Building your plan…"} onClick={() => hasProfile ? generatePlan() : setOpen(true)}>{activePlan ? "Plan saved" : hasProfile ? "Generate my plan" : "Complete profile"}<Sparkles /></Button></div></div>
+        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground"><span className={`rounded-full border px-2.5 py-1 font-medium ${activePlan ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>● &nbsp;{activePlan ? "Ready" : "Preview"}</span><span>{activePlan ? `Week of ${formatPlanDate(activePlan.weekStart)}` : "Generate your first saved plan"}</span></div><h1 className="text-3xl font-semibold tracking-[-.045em] sm:text-4xl">Your ideas for this week</h1><p className="mt-2 max-w-2xl leading-7 text-muted-foreground">{activePlan ? `Five useful starting points for ${name}, shaped around your audience, voice, and goals.` : "This preview shows the format. Complete your profile, then generate a plan that is saved to your account."}</p></div><div className="flex flex-wrap gap-2">{activePlan && <a className="inline-flex h-11 items-center gap-2 rounded-xl border bg-background px-4 text-sm font-medium hover:bg-accent" href={`/api/plans/${activePlan.id}/pdf`}><Download className="size-4" />Download PDF</a>}<Button variant="outline" className="h-11 rounded-xl" onClick={() => setOpen(true)}>Edit business profile</Button><Button className="h-11 rounded-xl" disabled={Boolean(activePlan) || generationStatus === "Building your plan…"} onClick={() => hasProfile ? generatePlan() : setOpen(true)}>{activePlan ? "Plan saved" : hasProfile ? "Generate my plan" : "Complete profile"}<Sparkles /></Button></div></div>
         {generationStatus && <p className="mb-5 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground">{generationStatus}</p>}
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="overflow-hidden rounded-[1.5rem] border bg-card shadow-[0_16px_50px_rgba(45,35,80,.07)]"><div className="flex items-center gap-2 border-b px-6 py-4"><WandSparkles className="size-4 text-primary" /><b className="text-sm">{activePlan ? "Copywriter plan" : "Copywriter preview"}</b></div><div className="divide-y">{displayIdeas.map((idea, index) => { const active = expanded === index; return <article key={idea[4]} className={active ? "bg-accent/35" : "hover:bg-accent/20"}><button className="grid w-full grid-cols-[58px_1fr_auto] gap-3 px-4 py-5 text-left sm:grid-cols-[76px_1fr_auto] sm:px-6" onClick={() => setExpanded(index)}><div><b className="text-xs tracking-[.14em] text-primary">{idea[0]}</b><span className="mt-1 block text-xs text-muted-foreground">{idea[2]}</span></div><div><div className="mb-2 flex flex-wrap gap-1.5"><Badge>{idea[1]}</Badge><Badge outline>{idea[3]}</Badge>{idea[11] !== "evergreen" && <Badge outline>{idea[11]} trend</Badge>}</div><h2 className="font-semibold leading-6 sm:text-lg">{idea[4]}</h2>{!active && <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">“{idea[5]}”</p>}</div><ChevronRight className={`mt-1 size-5 text-muted-foreground transition ${active ? "rotate-90" : ""}`} /></button>{active && <div className="grid gap-5 px-5 pb-6 pl-[75px] sm:grid-cols-2 sm:pl-[106px]"><Detail label="Hook" value={`“${idea[5]}”`} /><Detail label="Why this works" value={idea[6]} /><Detail label="Creative direction" value={idea[7]} /><Detail label="Suggested CTA" value={idea[9]} />{idea[12] && <TrendDetail type={idea[11]} title={idea[12]} sourceTitle={idea[13]} sourceUrl={idea[14]} />}<CopyDetail value={idea[8]} status={copyError === index ? "Copy failed" : copiedIdea === index ? "Copied" : "Copy draft"} revisionStatus={revisionStatus[idea[10]]} onCopy={() => copyDraft(index, idea)} onRevise={(preset) => reviseDraft(idea[10], preset)} /></div>}</article>})}</div></div>
@@ -247,9 +321,9 @@ export function IdeaTentApp() {
         </div>
       </section>
 
-      <Section id="plans" eyebrow="Your library" title="Previous plans"><div className="overflow-hidden rounded-[1.35rem] border bg-card">{plans.length ? plans.map((plan) => <button key={plan.id} className="flex w-full items-center justify-between border-b px-5 py-4 text-left last:border-0 hover:bg-accent"><span className="flex items-center gap-4"><span className="grid size-10 place-items-center rounded-xl bg-accent"><CalendarDays className="size-4" /></span><span><b className="block">Week of {formatPlanDate(plan.weekStart)}</b><span className="text-sm text-muted-foreground">{plan.ideas.length} ideas · {plan.status === "ready" ? "Plan ready" : plan.status}</span></span></span><ArrowRight className="size-4" /></button>) : <p className="px-5 py-8 text-sm text-muted-foreground">{plansLoaded ? "Your saved plans will appear here after you generate the first one." : "Loading your plans…"}</p>}</div></Section>
+      <Section id="plans" eyebrow="Your library" title="Previous plans"><div className="overflow-hidden rounded-[1.35rem] border bg-card">{plans.length ? plans.map((plan) => <div key={plan.id} className="flex items-center justify-between gap-4 border-b px-5 py-4 last:border-0"><span className="flex min-w-0 items-center gap-4"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent"><CalendarDays className="size-4" /></span><span className="min-w-0"><b className="block">Week of {formatPlanDate(plan.weekStart)}</b><span className="text-sm text-muted-foreground">{plan.ideas.length} ideas · {plan.status === "ready" ? "Plan ready" : plan.status}</span></span></span>{plan.status === "ready" && <a className="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent" href={`/api/plans/${plan.id}/pdf`}><Download className="size-4" /><span className="hidden sm:inline">PDF</span></a>}</div>) : <p className="px-5 py-8 text-sm text-muted-foreground">{plansLoaded ? "Your saved plans will appear here after you generate the first one." : "Loading your plans…"}</p>}</div></Section>
       <Section id="profile" eyebrow="Business profile" title="The context behind every idea"><div className="grid gap-3 sm:grid-cols-2"><Card icon={<Lightbulb />} label="Business" value={hasProfile ? `${name} · ${industry}` : "Not completed yet"} /><Card icon={<Users />} label="Audience" value={audience || "Not completed yet"} /><Card icon={<Sparkles />} label="Voice" value={selectedTones.join(", ") || "Not completed yet"} /><Card icon={<Target />} label="Goals" value={selectedGoals.join(", ") || "Not completed yet"} /></div><Button className="mt-5" onClick={() => setOpen(true)}>{hasProfile ? "Update profile" : "Complete profile"}</Button></Section>
-      <Section id="admin" eyebrow="Account status" title="Your private beta workspace"><div className="grid gap-3 sm:grid-cols-3"><Card icon={<Users />} label="Business profile" value={name ? "Ready" : "Incomplete"} /><Card icon={<Check />} label="Saved plans" value={`${plans.length}`} /><Card icon={<Sparkles />} label="Latest generation" value={activePlan ? activePlan.status : "Not started"} /></div></Section>
+      {session?.isAdmin && <Section id="admin" eyebrow="Private beta admin" title="Manage invited businesses"><div className="rounded-[1.35rem] border bg-card p-5 sm:p-6"><div className="flex items-start gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="size-5" /></span><div><b>Approve an email</b><p className="mt-1 text-sm leading-6 text-muted-foreground">They will sign in with this exact address. You can disable access at any time.</p></div></div><div className="mt-5 flex flex-col gap-2 sm:flex-row"><Input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="owner@business.com" aria-label="Email to approve" /><Button onClick={addApprovedUser} disabled={!inviteEmail.trim()}><Plus />Approve email</Button></div>{adminStatus && <p className="mt-3 text-sm text-muted-foreground">{adminStatus}</p>}</div><div className="mt-4 overflow-hidden rounded-[1.35rem] border bg-card">{approved.length ? approved.map((user) => <div key={user.id} className="flex flex-col gap-3 border-b px-5 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="truncate">{user.email}</b><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${user.status === "active" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>{user.status}</span></div><p className="mt-1 text-sm text-muted-foreground">{user.businessName ? `${user.businessName} · ${user.businessStatus}` : "Has not completed onboarding"}</p></div><Button variant="outline" onClick={() => changeApproval(user)}>{user.status === "active" ? "Disable" : "Reactivate"}</Button></div>) : <p className="px-5 py-8 text-sm text-muted-foreground">No invited emails yet.</p>}</div></Section>}
     </div>
 
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[92vh] overflow-y-auto rounded-[1.5rem] p-0 sm:max-w-2xl" showCloseButton={false}><div className="border-b px-6 pb-5 pt-6 sm:px-8"><div className="mb-5 flex justify-between"><b className="text-sm text-primary">{step} of 5</b><button onClick={() => setOpen(false)} aria-label="Close"><X className="size-4" /></button></div><Progress value={step * 20} /><DialogHeader className="mt-7"><DialogTitle className="text-2xl">{titles[step - 1]}</DialogTitle><DialogDescription>A little context now makes every weekly plan more specific.</DialogDescription></DialogHeader></div><div className="min-h-[300px] px-6 py-6 sm:px-8">{step === 1 && <div className="grid gap-5"><Field label="Business name"><Input value={name} placeholder="e.g. Cedar & Finch" onChange={(e) => setName(e.target.value)} /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Industry"><Input value={industry} placeholder="e.g. Brand and design studio" onChange={(e) => setIndustry(e.target.value)} /></Field><Field label="City, country"><Input value={location} placeholder="e.g. Lagos, Nigeria" onChange={(e) => setLocation(e.target.value)} /></Field></div><Field label="What does your business do?"><Textarea value={description} placeholder="Describe your offer and the value you create." onChange={(e) => setDescription(e.target.value)} rows={3} /></Field></div>}{step === 2 && <Field label="Describe your ideal customer"><Textarea value={audience} placeholder="Who are they, and what are they trying to achieve?" onChange={(e) => setAudience(e.target.value)} rows={6} /></Field>}{step === 3 && <Choices options={tones} selected={selectedTones} toggle={(value) => toggle(value, selectedTones, setSelectedTones)} />}{step === 4 && <Choices options={goals} selected={selectedGoals} toggle={(value) => toggle(value, selectedGoals, setSelectedGoals)} />}{step === 5 && <Field label="Primary channels"><Select value={platform} onValueChange={setPlatform}><SelectTrigger className="w-full"><SelectValue placeholder="Choose your primary channels" /></SelectTrigger><SelectContent><SelectItem value="Instagram">Instagram</SelectItem><SelectItem value="LinkedIn">LinkedIn</SelectItem><SelectItem value="Instagram + LinkedIn">Instagram + LinkedIn</SelectItem></SelectContent></Select></Field>}{saveStatus && <p className="mt-5 text-sm text-muted-foreground">{saveStatus}</p>}</div><div className="flex justify-between border-t px-6 py-5 sm:px-8"><Button variant="ghost" disabled={step === 1} onClick={() => setStep(step - 1)}>Back</Button><Button disabled={saveStatus === "Saving…" || !canContinue} onClick={() => step === 5 ? saveProfile() : setStep(step + 1)}>{step === 5 ? "Save profile" : "Continue"}<ArrowRight /></Button></div></DialogContent></Dialog>
@@ -267,3 +341,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Choices({ options, selected, toggle }: { options: string[]; selected: string[]; toggle: (value: string) => void }) { return <div className="grid gap-3 sm:grid-cols-2">{options.map((option) => <label key={option} className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${selected.includes(option) ? "border-primary bg-primary/5" : ""}`}><Checkbox checked={selected.includes(option)} onCheckedChange={() => toggle(option)} />{option}</label>)}</div>; }
 function parseList(value: unknown, fallback: string[]) { try { const parsed = typeof value === "string" ? JSON.parse(value) : value; return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : fallback; } catch { return fallback; } }
 function formatPlanDate(value: string) { const date = new Date(`${value}T00:00:00Z`); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date); }
+function AccessState({ title, detail }: { title: string; detail: string }) { return <main className="grid min-h-screen place-items-center bg-background px-5 text-foreground"><div className="max-w-md rounded-[1.5rem] border bg-card p-8 text-center shadow-[0_16px_50px_rgba(45,35,80,.08)]"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground"><Lightbulb className="size-5" /></span><h1 className="mt-5 text-2xl font-semibold tracking-[-.035em]">{title}</h1><p className="mt-3 leading-7 text-muted-foreground">{detail}</p></div></main>; }

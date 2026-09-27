@@ -1,18 +1,18 @@
 import { and, eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
-import { businesses, planFeedback, users, weeklyPlans } from "@/db/schema";
+import { businesses, planFeedback, weeklyPlans } from "@/db/schema";
+import { getAppAccess } from "@/lib/access-control";
 
 export async function POST(request: Request) {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
 
   const body = (await request.json()) as { weeklyPlanId?: string; useful?: boolean; comment?: string };
   if (!body.weeklyPlanId || typeof body.useful !== "boolean") {
     return Response.json({ error: "weeklyPlanId and useful are required" }, { status: 400 });
   }
   const db = getDb();
-  const user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  const user = access.user;
   if (!user) return Response.json({ error: "Business not found" }, { status: 404 });
   const business = await db.query.businesses.findFirst({ where: eq(businesses.userId, user.id) });
   if (!business) return Response.json({ error: "Business not found" }, { status: 404 });

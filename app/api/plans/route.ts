@@ -1,21 +1,20 @@
 import { desc, eq, inArray } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
 import {
   businessProfiles,
   businesses,
   contentIdeas,
-  users,
   weeklyPlans,
 } from "@/db/schema";
 import { generateBusinessPlan, mondayFor } from "@/lib/generate-business-plan";
+import { getAppAccess } from "@/lib/access-control";
 
 export async function GET() {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
 
   const db = getDb();
-  const user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  const user = access.user;
   if (!user) return Response.json({ plans: [] });
   const business = await db.query.businesses.findFirst({ where: eq(businesses.userId, user.id) });
   if (!business) return Response.json({ plans: [] });
@@ -39,11 +38,11 @@ export async function GET() {
 }
 
 export async function POST() {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
 
   const db = getDb();
-  const user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  const user = access.user;
   if (!user) return Response.json({ error: "Complete your business profile first" }, { status: 409 });
   const business = await db.query.businesses.findFirst({ where: eq(businesses.userId, user.id) });
   if (!business) return Response.json({ error: "Complete your business profile first" }, { status: 409 });

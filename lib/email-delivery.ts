@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import type { GeneratedIdea } from "@/lib/plan-generator";
+import { buildWeeklyPlanPdf, planPdfFilename } from "@/lib/plan-pdf";
 
-type EmailBusiness = { name: string };
+type EmailBusiness = { name: string; industry?: string; city?: string; country?: string };
 
 export async function sendWeeklyPlanEmail(
   recipient: string,
@@ -29,15 +30,34 @@ export async function sendWeeklyPlanEmail(
   const appUrl = (env.APP_URL || "https://ideatent.jeriesmind.workers.dev").replace(/\/$/, "");
   const subject = `Your IdeaTent posts for the week of ${weekStart}`;
   const html = renderPlanEmail(business.name, weekStart, ideas, `${appUrl}/#home`);
+  const pdf = await buildWeeklyPlanPdf(business, weekStart, ideas);
+  const filename = planPdfFilename(business.name, weekStart);
+  const mixedBoundary = `ideatent-mixed-${crypto.randomUUID()}`;
+  const alternativeBoundary = `ideatent-alternative-${crypto.randomUUID()}`;
   const mime = [
     `From: IdeaTent <${env.GMAIL_SENDER_EMAIL}>`,
     `To: ${recipient}`,
     `Subject: ${subject}`,
     "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+    "",
+    `--${mixedBoundary}`,
+    `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+    "",
+    `--${alternativeBoundary}`,
     "Content-Type: text/html; charset=UTF-8",
     "Content-Transfer-Encoding: 8bit",
     "",
     html,
+    `--${alternativeBoundary}--`,
+    "",
+    `--${mixedBoundary}`,
+    `Content-Type: application/pdf; name="${filename}"`,
+    `Content-Disposition: attachment; filename="${filename}"`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64Lines(pdf),
+    `--${mixedBoundary}--`,
   ].join("\r\n");
 
   const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
@@ -47,6 +67,14 @@ export async function sendWeeklyPlanEmail(
   });
   if (!sendResponse.ok) return { sent: false as const, skipped: false as const, error: `Gmail delivery failed (${sendResponse.status})` };
   return { sent: true as const, skipped: false as const };
+}
+
+function base64Lines(value: Uint8Array) {
+  let binary = "";
+  for (let offset = 0; offset < value.length; offset += 0x8000) {
+    binary += String.fromCharCode(...value.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary).match(/.{1,76}/g)?.join("\r\n") ?? "";
 }
 
 function renderPlanEmail(businessName: string, weekStart: string, ideas: GeneratedIdea[], appUrl: string) {

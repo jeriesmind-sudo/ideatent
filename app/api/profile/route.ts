@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
 import { businessProfiles, businesses, users } from "@/db/schema";
+import { getAppAccess } from "@/lib/access-control";
 
 type ProfileInput = {
   name?: string;
@@ -18,11 +18,11 @@ type ProfileInput = {
 };
 
 export async function GET() {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
 
   const db = getDb();
-  const user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  const user = access.user;
   if (!user) return Response.json({ profile: null });
   const business = await db.query.businesses.findFirst({ where: eq(businesses.userId, user.id) });
   if (!business) return Response.json({ profile: null });
@@ -31,8 +31,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "Sign in required" }, { status: 401 });
+  const access = await getAppAccess();
+  if (!access.ok) return access.response;
+  const { identity } = access;
 
   const body = (await request.json()) as ProfileInput;
   const name = body.name?.trim();
@@ -47,11 +48,11 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const db = getDb();
-  let user = await db.query.users.findFirst({ where: eq(users.authUserId, identity.userId) });
+  let user = access.user;
   if (!user) {
     const id = crypto.randomUUID();
     await db.insert(users).values({ id, authUserId: identity.userId, email: identity.email.toLowerCase(), createdAt: now, updatedAt: now });
-    user = await db.query.users.findFirst({ where: eq(users.id, id) });
+    user = (await db.query.users.findFirst({ where: eq(users.id, id) })) ?? null;
   }
   if (!user) return Response.json({ error: "Unable to create user" }, { status: 500 });
 
