@@ -81,8 +81,12 @@ function renderPlanEmail(businessName: string, weekStart: string, ideas: Generat
   const posts = ideas.map((idea) => `<section style="margin:24px 0;padding:20px;border:1px solid #e8e6ef;border-radius:14px">
     <p style="margin:0 0 6px;color:#6558d3;font-size:12px;font-weight:700;text-transform:uppercase">${escapeHtml(idea.day)} · ${escapeHtml(idea.platform)} · ${escapeHtml(idea.contentType)}</p>
     <h2 style="margin:0 0 12px;font-size:19px">${escapeHtml(idea.idea)}</h2>
-    <p style="margin:0 0 10px"><strong>${escapeHtml(idea.hook)}</strong></p>
-    <p style="margin:0 0 12px;white-space:pre-wrap">${escapeHtml(idea.captionDirection)}</p>
+    <p style="margin:16px 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Text for the design</p>
+    <div style="margin:0 0 16px;padding:14px;background:#f7f6fa;border-radius:10px;white-space:pre-wrap;line-height:1.55">${escapeHtml(idea.designCopy || `HEADLINE\n${idea.hook}\n\nSUPPORTING TEXT\n${idea.idea}\n\nCTA\n${idea.cta}`)}</div>
+    <p style="margin:0 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Designer instructions</p>
+    <p style="margin:0 0 16px;line-height:1.55">${escapeHtml(idea.creativeDirection)}</p>
+    <p style="margin:0 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Caption to post</p>
+    <p style="margin:0 0 12px;white-space:pre-wrap;line-height:1.55">${escapeHtml(idea.captionDirection)}</p>
     <p style="margin:0;color:#514b62"><strong>CTA:</strong> ${escapeHtml(idea.cta)}</p>
     ${idea.trendSourceUrl ? `<p style="margin:12px 0 0;font-size:12px"><a href="${escapeAttribute(idea.trendSourceUrl)}">Trend source: ${escapeHtml(idea.trendSourceTitle || idea.trendTitle)}</a></p>` : ""}
   </section>`).join("");

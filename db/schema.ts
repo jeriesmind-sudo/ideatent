@@ -87,6 +87,7 @@ export const contentIdeas = sqliteTable("content_ideas", {
   category: text("category").notNull(),
   idea: text("idea").notNull(),
   hook: text("hook").notNull(),
+  designCopy: text("design_copy").notNull().default(""),
   whyItWorks: text("why_it_works").notNull(),
   creativeDirection: text("creative_direction").notNull(),
   captionDirection: text("caption_direction").notNull(),

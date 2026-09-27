@@ -4,7 +4,7 @@ import { businesses, contentIdeas, weeklyPlans } from "@/db/schema";
 import { getAppAccess } from "@/lib/access-control";
 import { buildWeeklyPlanPdf, planPdfFilename } from "@/lib/plan-pdf";
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const access = await getAppAccess();
   if (!access.ok) return access.response;
   if (!access.user) return Response.json({ error: "Plan not found" }, { status: 404 });
@@ -22,11 +22,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     .orderBy(contentIdeas.position);
   const pdf = await buildWeeklyPlanPdf(business, plan.weekStart, ideas);
   const filename = planPdfFilename(business.name, plan.weekStart);
+  const download = new URL(request.url).searchParams.get("download") === "1";
 
   return new Response(new Uint8Array(pdf).buffer, {
     headers: {
       "content-type": "application/pdf",
-      "content-disposition": `attachment; filename="${filename}"`,
+      "content-disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
+      "x-content-type-options": "nosniff",
       "cache-control": "private, no-store",
     },
   });

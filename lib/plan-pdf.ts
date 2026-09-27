@@ -7,6 +7,7 @@ type PdfIdea = {
   category: string;
   idea: string;
   hook: string;
+  designCopy?: string | null;
   whyItWorks: string;
   creativeDirection: string;
   captionDirection: string;
@@ -60,11 +61,11 @@ function drawBrandHeader(context: PdfContext, business: PdfBusiness, weekStart: 
 
 function drawIdea(context: PdfContext, idea: PdfIdea, position: number) {
   const sections = [
-    { label: "Hook", value: idea.hook },
-    { label: "Ready-to-post copy", value: idea.captionDirection },
-    { label: "Creative direction", value: idea.creativeDirection },
-    { label: "Why it works", value: idea.whyItWorks },
+    { label: "Text for the design", value: designerCopy(idea) },
+    { label: "Designer instructions", value: idea.creativeDirection },
+    { label: "Caption to post", value: idea.captionDirection },
     { label: "CTA", value: idea.cta },
+    { label: "Why this works", value: idea.whyItWorks },
   ];
   const titleLines = wrapText(clean(idea.idea), context.bold, 17, TEXT_WIDTH - 42);
   const bodyHeight = sections.reduce((total, section) => total + 23 + (wrapText(clean(section.value), context.regular, 10, TEXT_WIDTH - 42).length * 14), 0);
@@ -99,6 +100,10 @@ function drawIdea(context: PdfContext, idea: PdfIdea, position: number) {
   context.y -= 18;
   context.page.drawLine({ start: { x: MARGIN, y: context.y }, end: { x: PAGE_WIDTH - MARGIN, y: context.y }, thickness: 0.7, color: rgb(0.88, 0.87, 0.91) });
   context.y -= 25;
+}
+
+function designerCopy(idea: PdfIdea) {
+  return idea.designCopy?.trim() || `HEADLINE\n${idea.hook}\n\nSUPPORTING TEXT\n${idea.idea}\n\nCTA\n${idea.cta}`;
 }
 
 function ensureSpace(context: PdfContext, required: number) {
