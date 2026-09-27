@@ -14,7 +14,21 @@ export async function generateBusinessPlan(db: Database, business: Business, pro
   const existing = await db.query.weeklyPlans.findFirst({
     where: and(eq(weeklyPlans.businessId, business.id), eq(weeklyPlans.weekStart, weekStart)),
   });
-  if (existing) return { planId: existing.id, reused: true, generation: "existing" as const };
+  if (existing) {
+    if (recipient && existing.status === "ready" && existing.emailStatus !== "sent") {
+      const ideas = await db.select().from(contentIdeas)
+        .where(eq(contentIdeas.weeklyPlanId, existing.id))
+        .orderBy(contentIdeas.position);
+      await deliverPlan(db, existing.id, recipient, business, weekStart, ideas.map((idea) => ({
+        ...idea,
+        trendTitle: idea.trendTitle ?? "",
+        trendSourceTitle: idea.trendSourceTitle ?? "",
+        trendSourceUrl: idea.trendSourceUrl ?? "",
+        trendPublishedAt: idea.trendPublishedAt ?? "",
+      })));
+    }
+    return { planId: existing.id, reused: true, generation: "existing" as const };
+  }
 
   const now = new Date();
   const jobId = crypto.randomUUID();
