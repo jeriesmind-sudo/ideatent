@@ -3,9 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { approvedUsers, businessProfiles, businesses, users } from "@/db/schema";
 import { generateBusinessPlan, mondayFor } from "@/lib/generate-business-plan";
-
-const MAX_ACTIVE_BUSINESSES = 30;
-const BATCH_SIZE = 5;
+import { DAILY_GENERATION_BATCH, PRIVATE_BETA_USER_LIMIT } from "@/lib/product-limits";
 
 export async function POST(request: Request) {
   if (!env.AUTOMATION_SECRET || !(await validBearer(request, env.AUTOMATION_SECRET))) {
@@ -21,11 +19,11 @@ export async function POST(request: Request) {
     .innerJoin(approvedUsers, eq(approvedUsers.email, users.email))
     .where(eq(approvedUsers.status, "active"))
     .orderBy(asc(businesses.nextGenerationAt))
-    .limit(MAX_ACTIVE_BUSINESSES);
+    .limit(PRIVATE_BETA_USER_LIMIT);
 
   const due = candidates
     .filter(({ business }) => !business.nextGenerationAt || business.nextGenerationAt <= now)
-    .slice(0, BATCH_SIZE);
+    .slice(0, DAILY_GENERATION_BATCH);
   const results: Array<{ businessId: string; status: "generated" | "reused" | "failed" }> = [];
 
   for (const { business, email } of due) {

@@ -71,8 +71,8 @@ export async function getTrendSignals(industry: string, country: string): Promis
   if (!env.TAVILY_API_KEY) return { trends: [], researchedAt: now.toISOString(), live: false };
 
   const queries = [
-    `${industry} ${country} latest industry news consumer conversations trends`,
-    `${industry} social media content trends ${country} current month`,
+    `${industry} ${country} current changes customer questions decisions opportunities`,
+    `${industry} ${country} seasonal context customer concerns this month`,
   ];
   const settled = await Promise.allSettled(queries.map(searchTavily));
   const results = settled.flatMap((item) => item.status === "fulfilled" ? item.value : []);
@@ -109,7 +109,7 @@ async function searchTavily(query: string): Promise<SearchResult[]> {
       headers: { "content-type": "application/json", authorization: `Bearer ${env.TAVILY_API_KEY}` },
       body: JSON.stringify({
         query: query.slice(0, 390),
-        topic: "news",
+        topic: "general",
         search_depth: "advanced",
         time_range: "month",
         max_results: 6,
@@ -137,7 +137,7 @@ async function analyseResults(industry: string, country: string, results: Search
       messages: [
         {
           role: "system",
-          content: "You are a cautious trend researcher. Use only the supplied results. Reject weak, irrelevant, promotional, or unsupported claims. Preserve each source URL exactly. Identify useful content opportunities without pretending a trend is universal.",
+          content: "You are a cautious opportunity researcher. Use only the supplied results. Reject weak, irrelevant, promotional, competitor-led, or unsupported claims. Preserve each source URL exactly. Identify only timely developments that a brand can transform into an original explanation, demonstration, checklist, comparison, or point of view for its own customers. Never recommend turning a result into an article-summary or read-this-link post, and never pretend a trend is universal.",
         },
         {
           role: "user",
@@ -166,7 +166,7 @@ function fallbackSignals(results: SearchResult[]): TrendSignal[] {
     type: "industry",
     title: result.title,
     summary: result.content,
-    contentOpportunity: "Use this recent development only when it is clearly relevant to the business and audience.",
+    contentOpportunity: "If relevant, translate this development into an original explanation of what it means for the brand's customers. Do not promote the source or create a link post.",
     sourceTitle: result.title,
     sourceUrl: result.url,
     publishedAt: result.published_date,

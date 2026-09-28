@@ -2,12 +2,12 @@
 
 The application code now supports this weekly loop:
 
-1. Reuse fresh industry-and-country research or request current research from Tavily.
-2. Generate five complete, platform-ready posts with Cloudflare Workers AI.
-3. Run a second editorial pass for relevance, repetition, factual safety, voice, and variety.
-4. Save the posts and their source metadata in D1.
+1. Reuse fresh industry-and-country research or request current opportunities from Tavily.
+2. Build a lightweight candidate pool from evergreen ideas, timely opportunities, and reusable backlog ideas.
+3. Select and fully write the five strongest ideas for the business's current priority.
+4. Save the posts, unused candidates, learning signals, and source metadata in D1.
 5. Email the plan when Gmail credentials are configured.
-6. Let the business revise each post from the dashboard.
+6. Let the business revise posts and mark ideas used, skipped, or successful from the dashboard.
 
 ## Required app Worker bindings and secrets
 
@@ -28,11 +28,11 @@ Never place these values in Git or `wrangler.jsonc`.
 
 ## Database migration
 
-Apply `drizzle/0001_copywriter_trend_sources.sql` to the production `ideatent-db` database before deploying the new application code. It adds source metadata without deleting or rewriting existing plans.
+Apply migrations through `drizzle/0003_strategy_learning.sql` to the production `ideatent-db` database before deploying the new application code. The latest migration adds the current priority, reusable candidate backlog, and per-idea learning signals without deleting or rewriting existing plans.
 
 ## Weekly automation Worker
 
-`automation/wrangler.jsonc` defines a separate Worker that runs every Monday at 06:00 UTC. It calls the protected weekly endpoint and processes up to five due businesses sequentially. Repeated runs are safe because D1 enforces one plan per business and week.
+`automation/wrangler.jsonc` defines a separate Worker that runs daily at 06:00 UTC. It calls the protected weekly endpoint and processes up to five due businesses sequentially per day, while the private beta is capped at 20 active users. This spreads AI usage across the week instead of attempting every plan at once. Repeated runs are safe because D1 enforces one plan per business and week.
 
 Set these secrets on `ideatent-weekly-automation`:
 

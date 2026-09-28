@@ -83,7 +83,7 @@ function renderPlanEmail(businessName: string, weekStart: string, ideas: Generat
     <h2 style="margin:0 0 12px;font-size:19px">${escapeHtml(idea.idea)}</h2>
     <p style="margin:16px 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Text for the design</p>
     <div style="margin:0 0 16px;padding:14px;background:#f7f6fa;border-radius:10px;white-space:pre-wrap;line-height:1.55">${escapeHtml(idea.designCopy || `HEADLINE\n${idea.hook}\n\nSUPPORTING TEXT\n${idea.idea}\n\nCTA\n${idea.cta}`)}</div>
-    <p style="margin:0 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Designer instructions</p>
+    <p style="margin:0 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Visual direction</p>
     <p style="margin:0 0 16px;line-height:1.55">${escapeHtml(idea.creativeDirection)}</p>
     <p style="margin:0 0 6px;color:#6558d3;font-size:11px;font-weight:700;text-transform:uppercase">Caption to post</p>
     <p style="margin:0 0 12px;white-space:pre-wrap;line-height:1.55">${escapeHtml(idea.captionDirection)}</p>

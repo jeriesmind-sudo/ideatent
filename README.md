@@ -1,6 +1,6 @@
 # IdeaTent
 
-IdeaTent is a private-beta standby social-media copywriter. It learns a business profile, researches reusable current trends, produces five complete weekly posts, runs an editorial quality check, remembers recent ideas, supports on-demand rewrites, saves the plan, and can deliver it by email on a Cloudflare schedule.
+IdeaTent is a private-beta lightweight content strategist. It learns a business profile and current priority, considers evergreen and timely opportunities, shortlists more ideas than it publishes, selects five strong weekly posts, learns gradually from owner feedback, and can deliver the finished plan by email on a Cloudflare schedule.
 
 Production rollout instructions are in [docs/standby-copywriter-setup.md](docs/standby-copywriter-setup.md).
 
@@ -20,17 +20,20 @@ The live app is private. Visitors must pass the configured Cloudflare Access pol
 
 - Five-step business onboarding with required-field validation
 - Authenticated, persisted business profiles
-- AI-generated weekly plans with schema validation and a safe starter-plan fallback
+- Priority-led candidate shortlisting and AI-generated weekly plans with schema validation and a safe starter-plan fallback
+- Reusable backlog for strong ideas that do not make the current week
+- Per-idea used, skipped, worked-well, and revision learning signals
 - Saved plan history
 - Downloadable branded PDF plans
 - PDF attachment on every delivered weekly-plan email
 - Per-plan usefulness feedback
 - Private Worker access and server-side identity checks
 - Administrator page for approving, disabling, and reactivating beta users without code changes
+- Enforced 20-active-user private-beta limit with a visible admin count
 - Tavily-powered trend research and caching
-- Automated weekly generation with Cloudflare Cron Triggers
+- Daily due-user processing with Cloudflare Cron Triggers, capped at five generations per day
 - Weekly email delivery and delivery logging
-- Repetition checks across earlier plans
+- Repetition and preference checks across earlier plans without treating one action as a permanent rule
 - Mobile-first dashboard and onboarding flow
 
 ## Next hardening work
@@ -62,7 +65,7 @@ The production build emits its deployable Worker configuration under `dist/serve
 ## Data and configuration
 
 - D1 schema: `db/schema.ts`
-- D1 migration: `drizzle/0000_ideatent_foundation.sql`
+- D1 migrations: `drizzle/0000_ideatent_foundation.sql` through `drizzle/0003_strategy_learning.sql`
 - Plan generator: `lib/plan-generator.ts`
 - Main interface: `app/ideatent-app.tsx`
 - Hosting bindings: `.openai/hosting.json`

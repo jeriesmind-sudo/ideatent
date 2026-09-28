@@ -4,6 +4,7 @@ import {
   businessProfiles,
   businesses,
   contentIdeas,
+  ideaFeedback,
   weeklyPlans,
 } from "@/db/schema";
 import { generateBusinessPlan, mondayFor } from "@/lib/generate-business-plan";
@@ -28,13 +29,33 @@ export async function GET() {
   const ideas = await db.select().from(contentIdeas)
     .where(inArray(contentIdeas.weeklyPlanId, plans.map((plan) => plan.id)))
     .orderBy(contentIdeas.position);
+  const feedback = ideas.length
+    ? await db.select().from(ideaFeedback).where(inArray(ideaFeedback.contentIdeaId, ideas.map((idea) => idea.id)))
+    : [];
+  const feedbackByIdea = new Map(feedback.map((item) => [item.contentIdeaId, item]));
 
   return Response.json({
     plans: plans.map((plan) => ({
       ...plan,
-      ideas: ideas.filter((idea) => idea.weeklyPlanId === plan.id),
+      ideas: ideas.filter((idea) => idea.weeklyPlanId === plan.id).map((idea) => {
+        const item = feedbackByIdea.get(idea.id);
+        return {
+          ...idea,
+          feedbackStatus: item?.status ?? null,
+          feedbackReasons: item ? parseReasons(item.reasons) : [],
+        };
+      }),
     })),
   });
+}
+
+function parseReasons(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function POST() {

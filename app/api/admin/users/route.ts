@@ -1,7 +1,8 @@
-import { desc, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { approvedUsers, businesses, users } from "@/db/schema";
 import { getAppAccess, normalizeEmail } from "@/lib/access-control";
+import { PRIVATE_BETA_USER_LIMIT } from "@/lib/product-limits";
 
 export async function GET() {
   const access = await getAppAccess({ admin: true });
@@ -15,8 +16,11 @@ export async function GET() {
   const matchingBusinesses = matchingUsers.length
     ? await db.select().from(businesses).where(inArray(businesses.userId, matchingUsers.map((user) => user.id)))
     : [];
+  const activeCount = approvals.filter((approval) => approval.status === "active").length;
 
   return Response.json({
+    activeCount,
+    activeLimit: PRIVATE_BETA_USER_LIMIT,
     users: approvals.map((approval) => {
       const user = matchingUsers.find((item) => item.email === approval.email);
       const business = user ? matchingBusinesses.find((item) => item.userId === user.id) : undefined;
@@ -44,7 +48,15 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  await getDb().insert(approvedUsers)
+  const db = getDb();
+  const existing = await db.query.approvedUsers.findFirst({ where: eq(approvedUsers.email, email) });
+  if (!existing || existing.status !== "active") {
+    const [{ total }] = await db.select({ total: count() }).from(approvedUsers).where(eq(approvedUsers.status, "active"));
+    if (total >= PRIVATE_BETA_USER_LIMIT) {
+      return Response.json({ error: `The private beta is limited to ${PRIVATE_BETA_USER_LIMIT} active users. Disable an account before adding another.` }, { status: 409 });
+    }
+  }
+  await db.insert(approvedUsers)
     .values({ id: crypto.randomUUID(), email, status: "active", createdAt: now, updatedAt: now })
     .onConflictDoUpdate({ target: approvedUsers.email, set: { status: "active", updatedAt: now } });
   return Response.json({ ok: true, email });

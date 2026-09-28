@@ -13,6 +13,8 @@ type ProfileInput = {
   businessModel?: "b2b" | "b2c" | "both";
   brandTone?: string[];
   contentGoals?: string[];
+  currentPriority?: string;
+  priorityDetail?: string;
   platforms?: string[];
   postsPerWeek?: number;
 };
@@ -76,6 +78,8 @@ export async function POST(request: Request) {
     customerNeeds: "To be completed",
     brandTone: JSON.stringify(body.brandTone ?? []),
     contentGoals: JSON.stringify(body.contentGoals ?? []),
+    currentPriority: body.currentPriority?.trim().slice(0, 80) || body.contentGoals?.[0] || "Brand awareness",
+    priorityDetail: body.priorityDetail?.trim().slice(0, 500) || null,
     platforms: JSON.stringify(body.platforms ?? []),
     postsPerWeek: Math.min(5, Math.max(1, body.postsPerWeek ?? 5)),
     updatedAt: now,

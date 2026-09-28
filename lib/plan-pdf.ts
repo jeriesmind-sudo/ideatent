@@ -62,7 +62,7 @@ function drawBrandHeader(context: PdfContext, business: PdfBusiness, weekStart: 
 function drawIdea(context: PdfContext, idea: PdfIdea, position: number) {
   const sections = [
     { label: "Text for the design", value: designerCopy(idea) },
-    { label: "Designer instructions", value: idea.creativeDirection },
+    { label: "Visual direction", value: idea.creativeDirection },
     { label: "Caption to post", value: idea.captionDirection },
     { label: "CTA", value: idea.cta },
     { label: "Why this works", value: idea.whyItWorks },

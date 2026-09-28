@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { businessProfiles, businesses, contentIdeas, emailLogs, generationJobs, weeklyPlans } from "@/db/schema";
+import { businessProfiles, businesses, contentIdeas, emailLogs, generationJobs, ideaBacklog, ideaFeedback, weeklyPlans } from "@/db/schema";
 import { sendWeeklyPlanEmail } from "@/lib/email-delivery";
-import { generateWeeklyPlan } from "@/lib/plan-generator";
+import { generateWeeklyPlan, type CandidateIdea, type LearningSignal } from "@/lib/plan-generator";
 import { getTrendSignals } from "@/lib/trend-research";
 import { incrementUsage } from "@/lib/usage";
 
@@ -47,19 +47,64 @@ export async function generateBusinessPlan(db: Database, business: Business, pro
       .orderBy(desc(weeklyPlans.weekStart))
       .limit(12);
     const recentIdeas = recentPlans.length
-      ? await db.select({ idea: contentIdeas.idea, hook: contentIdeas.hook }).from(contentIdeas)
+      ? await db.select({ idea: contentIdeas.idea, hook: contentIdeas.hook, contentType: contentIdeas.contentType, revisionCount: contentIdeas.revisionCount }).from(contentIdeas)
         .where(inArray(contentIdeas.weeklyPlanId, recentPlans.map((plan) => plan.id)))
       : [];
+    const savedRows = await db.select().from(ideaBacklog)
+      .where(and(eq(ideaBacklog.businessId, business.id), eq(ideaBacklog.status, "available")))
+      .orderBy(desc(ideaBacklog.updatedAt))
+      .limit(8);
+    const savedCandidates: CandidateIdea[] = savedRows.map((row) => ({
+      idea: row.idea,
+      angle: row.angle,
+      suggestedFormat: normaliseFormat(row.suggestedFormat),
+      platform: row.platform,
+      priorityFit: row.priorityFit,
+      timingReason: row.timingReason,
+      trendType: row.trendType,
+      trendTitle: row.trendTitle ?? "",
+      trendSourceTitle: row.trendSourceTitle ?? "",
+      trendSourceUrl: row.trendSourceUrl ?? "",
+      trendPublishedAt: row.trendPublishedAt ?? "",
+    }));
+    const feedbackRows = await db.select({
+      idea: contentIdeas.idea,
+      contentType: contentIdeas.contentType,
+      revisionCount: contentIdeas.revisionCount,
+      status: ideaFeedback.status,
+      reasons: ideaFeedback.reasons,
+    }).from(ideaFeedback)
+      .innerJoin(contentIdeas, eq(contentIdeas.id, ideaFeedback.contentIdeaId))
+      .where(eq(ideaFeedback.businessId, business.id))
+      .orderBy(desc(ideaFeedback.updatedAt))
+      .limit(30);
+    const learningSignals: LearningSignal[] = [
+      ...feedbackRows.map((row) => ({
+        idea: row.idea,
+        contentType: row.contentType,
+        status: row.status,
+        reasons: parseReasons(row.reasons),
+      })),
+      ...recentIdeas.filter((idea) => idea.revisionCount > 0).map((idea) => ({
+        idea: idea.idea,
+        contentType: idea.contentType,
+        status: "revised" as const,
+        reasons: ["The business edited this execution; keep the strategic signal weak and avoid overfitting."],
+      })),
+    ].slice(0, 30);
     const research = await getTrendSignals(business.industry, business.country);
     const generation = await generateWeeklyPlan(
       business,
       profile,
       research.trends,
       recentIdeas.flatMap((idea) => [idea.idea, idea.hook]),
+      savedCandidates,
+      learningSignals,
     );
     await db.insert(contentIdeas).values(generation.ideas.map((idea, position) => ({
       id: crypto.randomUUID(), weeklyPlanId: planId, position, createdAt: now, ...idea,
     })));
+    await rememberUnusedCandidates(db, business.id, savedRows, generation.candidates, generation.ideas.map((idea) => idea.idea), now);
     const completedAt = new Date();
     await db.update(weeklyPlans).set({ status: "ready", updatedAt: completedAt }).where(eq(weeklyPlans.id, planId));
     await db.update(generationJobs).set({ status: "successful", completedAt }).where(eq(generationJobs.id, jobId));
@@ -75,6 +120,64 @@ export async function generateBusinessPlan(db: Database, business: Business, pro
     await db.update(businesses).set({ status: "failed", updatedAt: completedAt }).where(eq(businesses.id, business.id));
     throw error;
   }
+}
+
+async function rememberUnusedCandidates(
+  db: Database,
+  businessId: string,
+  savedRows: Array<typeof ideaBacklog.$inferSelect>,
+  candidates: CandidateIdea[],
+  selectedIdeas: string[],
+  now: Date,
+) {
+  const selected = new Set(selectedIdeas.map(normaliseIdea));
+  for (const row of savedRows) {
+    if (selected.has(normaliseIdea(row.idea))) {
+      await db.update(ideaBacklog).set({ status: "selected", updatedAt: now }).where(eq(ideaBacklog.id, row.id));
+    }
+  }
+  const existing = new Set(savedRows.map((row) => normaliseIdea(row.idea)));
+  const unused = candidates.filter((candidate) => {
+    const key = normaliseIdea(candidate.idea);
+    return !selected.has(key) && !existing.has(key);
+  }).slice(0, 12);
+  if (!unused.length) return;
+  await db.insert(ideaBacklog).values(unused.map((candidate) => ({
+    id: crypto.randomUUID(),
+    businessId,
+    idea: candidate.idea,
+    angle: candidate.angle,
+    suggestedFormat: candidate.suggestedFormat,
+    platform: candidate.platform,
+    priorityFit: candidate.priorityFit,
+    timingReason: candidate.timingReason,
+    trendType: candidate.trendType,
+    trendTitle: candidate.trendTitle || null,
+    trendSourceTitle: candidate.trendSourceTitle || null,
+    trendSourceUrl: candidate.trendSourceUrl || null,
+    trendPublishedAt: candidate.trendPublishedAt || null,
+    status: "available" as const,
+    createdAt: now,
+    updatedAt: now,
+  })));
+}
+
+function parseReasons(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 5) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normaliseIdea(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normaliseFormat(value: string): CandidateIdea["suggestedFormat"] {
+  if (value === "Reel/video" || value === "Carousel" || value === "Single/static") return value;
+  return "Single/static";
 }
 
 async function deliverPlan(

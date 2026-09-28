@@ -50,6 +50,8 @@ export const businessProfiles = sqliteTable("business_profiles", {
   brandTone: text("brand_tone").notNull(),
   avoidTopics: text("avoid_topics"),
   contentGoals: text("content_goals").notNull(),
+  currentPriority: text("current_priority"),
+  priorityDetail: text("priority_detail"),
   platforms: text("platforms").notNull(),
   postsPerWeek: integer("posts_per_week").notNull().default(5),
   ...timestamps(),
@@ -97,7 +99,37 @@ export const contentIdeas = sqliteTable("content_ideas", {
   trendSourceTitle: text("trend_source_title"),
   trendSourceUrl: text("trend_source_url"),
   trendPublishedAt: text("trend_published_at"),
+  revisionCount: integer("revision_count").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+export const ideaFeedback = sqliteTable("idea_feedback", {
+  id: text("id").primaryKey(),
+  contentIdeaId: text("content_idea_id").notNull().unique(),
+  businessId: text("business_id").notNull(),
+  status: text("status", { enum: ["used", "skipped", "worked_well"] }).notNull(),
+  reasons: text("reasons").notNull().default("[]"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const ideaBacklog = sqliteTable("idea_backlog", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  idea: text("idea").notNull(),
+  angle: text("angle").notNull(),
+  suggestedFormat: text("suggested_format").notNull(),
+  platform: text("platform").notNull(),
+  priorityFit: text("priority_fit").notNull(),
+  timingReason: text("timing_reason").notNull(),
+  trendType: text("trend_type", { enum: ["global", "industry", "platform", "seasonal", "evergreen"] }).notNull().default("evergreen"),
+  trendTitle: text("trend_title"),
+  trendSourceTitle: text("trend_source_title"),
+  trendSourceUrl: text("trend_source_url"),
+  trendPublishedAt: text("trend_published_at"),
+  status: text("status", { enum: ["available", "selected"] }).notNull().default("available"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
 export const generationJobs = sqliteTable("generation_jobs", {

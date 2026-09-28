@@ -1,0 +1,2 @@
+export const PRIVATE_BETA_USER_LIMIT = 20;
+export const DAILY_GENERATION_BATCH = 5;

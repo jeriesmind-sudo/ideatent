@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { businessProfiles, businesses, contentIdeas, weeklyPlans } from "@/db/schema";
 import { incrementUsage } from "@/lib/usage";
@@ -65,7 +65,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const revision = parseRevision(response);
   if (!revision) return Response.json({ error: "The editor could not produce a safe revision" }, { status: 502 });
 
-  await db.update(contentIdeas).set(revision).where(eq(contentIdeas.id, idea.id));
+  await db.update(contentIdeas).set({ ...revision, revisionCount: sql`${contentIdeas.revisionCount} + 1` }).where(eq(contentIdeas.id, idea.id));
   return Response.json({ ok: true, idea: { ...idea, ...revision } });
 }
 
