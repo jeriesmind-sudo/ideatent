@@ -5,7 +5,7 @@
   "compatibility_date": "2026-09-25",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "APP_URL": "https://ideatent.jeriesmind.workers.dev"
+    "APP_URL": "https://my.ideatent.workers.dev"
   },
   "triggers": {
     "crons": ["0 6 * * MON"]

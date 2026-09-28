@@ -15,7 +15,7 @@ The main `ideatent` Worker needs its existing `DB` and `AI` bindings plus:
 
 - `TAVILY_API_KEY` — secret used for current trend research.
 - `AUTOMATION_SECRET` — a long random secret shared only with the automation Worker.
-- `APP_URL` — `https://ideatent.jeriesmind.workers.dev`.
+- `APP_URL` — `https://my.ideatent.workers.dev`.
 
 For automatic email delivery, also add these secrets:
 

@@ -8,7 +8,7 @@ IdeaTent is an invite-only weekly content-planning product for businesses. It le
 
 ## Live private beta
 
-- App: https://ideatent.jeriesmind.workers.dev
+- App: https://my.ideatent.workers.dev
 - Hosting: Cloudflare Workers
 - Access: Cloudflare Zero Trust sign-in plus an in-app email allowlist
 - Data: Cloudflare D1

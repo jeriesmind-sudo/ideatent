@@ -27,7 +27,7 @@ export async function sendWeeklyPlanEmail(
   const token = await tokenResponse.json() as { access_token?: string };
   if (!token.access_token) return { sent: false as const, skipped: false as const, error: "Gmail authorization returned no access token" };
 
-  const appUrl = (env.APP_URL || "https://ideatent.jeriesmind.workers.dev").replace(/\/$/, "");
+  const appUrl = (env.APP_URL || "https://my.ideatent.workers.dev").replace(/\/$/, "");
   const subject = `Your IdeaTent posts for the week of ${weekStart}`;
   const html = renderPlanEmail(business.name, weekStart, ideas, `${appUrl}/#home`);
   const pdf = await buildWeeklyPlanPdf(business, weekStart, ideas);
